@@ -1,0 +1,27 @@
+# Code review findings
+
+Findings below describe defects addressed in the implementation. Local tests use mocked MongoDB collections except for the
+integration test, which was skipped; live-server behavior is not claimed as verified.
+
+| # | Location | Defect and impact | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | `serialize_employee`, `serialize_attendance`, `serialize_history_entry` | MongoDB BSON datetimes and nested history values need conversion before JSON serialization; internal `_id` values must not leak into API responses. Otherwise responses can fail serialization or violate the API contract. | `test_punch_out_and_regularization_history` exercises the response/history shape; serializers normalize date values and omit `_id`. | Normalize BSON datetimes and nested history values to epoch milliseconds; remove `_id` from serialized documents. |
+| 2 | `ensure_indexes`, `lifespan` | Suppressing index-creation failures could let the service start without the unique constraints required for employee and daily-attendance uniqueness. | Startup calls `ensure_indexes()` directly; errors are not swallowed. `test_explain_validation_and_index_declarations` checks declared index specifications and repeated declarations using fakes only. | Create indexes in FastAPI lifespan and allow failures to surface rather than continuing silently. |
+| 3 | `punch_in`, unique attendance index | An existence check alone cannot prevent two simultaneous requests from both observing no record and inserting duplicates. | `test_punch_in_duplicate_and_concurrent_conflict` covers the mocked endpoint behavior; code handles `DuplicateKeyError` as HTTP 409. No live race test was run. | Enforce unique `(emp_code, date)` at the database and translate an insert collision to 409. |
+| 4 | `punch_out` | Selecting an arbitrary eligible record or updating without an open-record condition can choose the wrong shift record or allow competing punch-outs to overwrite one another. | Code selects the latest eligible punch-in and updates only if `punch_out` is still null; `test_punch_out_and_regularization_history` covers sequential behavior with fakes. | Select the most recent eligible record and conditionally update it; a failed compare-and-set returns 409. Live concurrent behavior remains unverified. |
+| 5 | `regularize_attendance` | Concurrent corrections must not overwrite one another's audit history or silently overwrite a changed record. | The update filters on the previously read status and punch values, atomically sets derived fields and pushes one history entry; a lost compare-and-set returns 409. Existing tests exercise history sequentially, not against concurrent MongoDB requests. | Use one conditional MongoDB update with `$push` for history and report a conflict when the record changed. |
+| 6 | `employee_monthly`, `department_summary`, `late_leaderboard`, `department_trend` | Python-side collection scans do not meet the assignment's aggregation requirement or scale target. | Each endpoint now submits a MongoDB aggregation pipeline; `test_monthly_and_department_analytics` checks outputs using the fake aggregation harness. Real MongoDB execution is unverified. | Move the calculations and joins into MongoDB aggregation pipelines; retain only response formatting in Python. |
+| 7 | `explain_endpoint` | A simplified query would not explain the operation actually run by an endpoint; aggregation cursor `.explain()` is also not available in the installed PyMongo cursor API. | `test_explain_matches_endpoint_queries_and_aggregations` compares the command/pipeline with the endpoint operations using fakes. No live plan was collected. | Reuse endpoint query and pipeline builders and issue `explain` with `executionStats`; actual `IXSCAN`/`COLLSCAN` results remain unverified. |
+
+## Contract gaps addressed after the final audit
+
+| Location | Gap and impact | Evidence | Status |
+|---|---|---|---|
+| `list_attendance`, `attendance_filter` | Invalid status values and malformed dates were not rejected, and range checking compared unvalidated date strings. | `test_attendance_list_validates_status_dates_and_range` checks invalid and valid filters; OpenAPI enumerates the five allowed statuses and requires date filters in `YYYY-MM-DD` form. | Added strict date/status validation and calendar-date range checking; reused by `explain_endpoint`. |
+| `department_trend_pipeline` | Malformed date strings could escape as `ValueError` and produce HTTP 500. | `test_department_trend_rejects_malformed_dates_and_accepts_valid_range` checks malformed/impossible/reversed dates and a valid gap-filled range. | Validate both dates before constructing the pipeline and return HTTP 422 for invalid input. |
+| `punch_out` | The eligible-record query excluded punch-ins later than the supplied punch-out, causing an invalid time to appear as a missing record (404) instead of 422. | `test_punch_out_before_punch_in_is_422_but_missing_record_is_404` checks the invalid-time status, true missing-record status, and successful punch-out. | When no eligible record is found, check for a later presence punch-in and return 422; retain 404 when no such attendance exists. |
+
+## Latest verification
+
+`python -m py_compile app/main.py` completed successfully. `python -m pytest -q`: **13 passed, 1 skipped, 2 warnings**.
+The real-MongoDB integration test was skipped; these results do not verify live database behavior.
