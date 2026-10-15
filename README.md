@@ -35,6 +35,10 @@ Start the service with the assignment's command:
 uvicorn app.main:app --port 8000
 ```
 
+The employee and attendance dashboard is served by FastAPI at **http://127.0.0.1:8000/**. Start MongoDB and configure
+the existing application database as above, then run the command from the project directory and open that URL in a
+browser. The page uses the existing API routes; no frontend dependencies or separate CORS configuration are required.
+
 Indexes are requested during FastAPI startup. Successful creation, idempotency on a live server, and resulting query
 plans have not been verified against a live MongoDB instance in the latest test run.
 

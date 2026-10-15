@@ -5,10 +5,13 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StrictInt, field_validator, model_validator
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
@@ -58,6 +61,13 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Employee Attendance & Analytics API", version="2.0.0", lifespan=lifespan)
+FRONTEND_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def frontend():
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 def as_utc(dt: Optional[datetime]) -> Optional[datetime]:

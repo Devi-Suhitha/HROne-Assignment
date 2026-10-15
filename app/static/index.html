@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <title>HROne | People & Attendance</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#overview" aria-label="HROne home">
+          <span class="brand-mark">H</span>
+          <span>hr<span class="brand-accent">one</span><small>PEOPLE OPERATIONS</small></span>
+        </a>
+        <p class="nav-label">WORKSPACE</p>
+        <nav class="navigation" aria-label="Main navigation">
+          <a class="nav-link active" href="#overview"><span>◫</span> Overview</a>
+          <a class="nav-link" href="#employees"><span>♙</span> Employees</a>
+          <a class="nav-link" href="#attendance"><span>◷</span> Attendance</a>
+          <a class="nav-link" href="#analytics"><span>▥</span> Analytics</a>
+        </nav>
+        <div class="sidebar-note">
+          <span class="status-dot"></span>
+          <div><strong>Attendance API</strong><small>Connected through FastAPI</small></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="mobile-brand"><span class="brand-mark">H</span> hr<span class="brand-accent">one</span></div>
+          <div class="breadcrumb">Workspace <span>/</span> People operations</div>
+          <button class="button button-quiet" id="refresh-all" type="button"><span aria-hidden="true">↻</span> Refresh data</button>
+        </header>
+        <nav class="mobile-nav" aria-label="Mobile navigation">
+          <a href="#overview">Overview</a><a href="#employees">Employees</a><a href="#attendance">Attendance</a><a href="#analytics">Analytics</a>
+        </nav>
+
+        <section class="page-heading" id="overview">
+          <div>
+            <p class="eyebrow">PEOPLE OPERATIONS</p>
+            <h1>Good day <span class="heading-spark">✦</span></h1>
+            <p class="muted">Your employee and attendance overview, all in one place.</p>
+          </div>
+          <div class="today-chip"><span class="status-dot"></span><span id="today-label">Today</span></div>
+        </section>
+
+        <section class="stats-grid" aria-label="Attendance overview">
+          <article class="stat-card">
+            <div class="stat-icon icon-violet">♙</div><p>Total employees</p>
+            <strong id="stat-employees">—</strong><small>In your directory</small>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon icon-green">✓</div><p>Present today</p>
+            <strong id="stat-present">—</strong><small>Attendance records</small>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon icon-amber">◷</div><p>Late arrivals</p>
+            <strong id="stat-late">—</strong><small>Records with late minutes</small>
+          </article>
+          <article class="stat-card">
+            <div class="stat-icon icon-blue">▦</div><p>Attendance records</p>
+            <strong id="stat-records">—</strong><small>For today</small>
+          </article>
+        </section>
+
+        <section class="section-block" id="employees">
+          <div class="section-heading">
+            <div><p class="eyebrow">YOUR TEAM</p><h2>Employees</h2><p class="muted">Manage your employee directory.</p></div>
+            <button class="button button-primary" type="button" id="toggle-employee-form">＋ Add employee</button>
+          </div>
+          <form class="panel form-panel hidden" id="employee-form">
+            <div class="panel-title"><div><h3>New employee</h3><p class="muted">Enter the employee details below.</p></div></div>
+            <div class="form-grid">
+              <label>Employee code<input name="emp_code" required pattern="EMP[0-9]{4,6}" placeholder="EMP0001" maxlength="9"></label>
+              <label>Full name<input name="name" required maxlength="100" placeholder="e.g. Asha Rao"></label>
+              <label>Email address<input name="email" type="email" required maxlength="120" placeholder="asha@company.com"></label>
+              <label>Department<input name="department" required maxlength="50" placeholder="e.g. Engineering"></label>
+              <label>Shift start<input name="shift_start" type="time" value="09:30" required></label>
+              <label>Shift end<input name="shift_end" type="time" value="18:30" required></label>
+              <label>Joined on<input name="joined_on" type="date" required></label>
+            </div>
+            <div class="form-actions"><button class="button button-quiet" type="button" id="cancel-employee">Cancel</button><button class="button button-primary" type="submit">Create employee</button></div>
+          </form>
+          <div class="panel table-panel">
+            <div class="table-toolbar"><div><h3>Employee directory</h3><p class="muted" id="employee-count">Loading employees…</p></div><button class="button button-quiet button-small" type="button" id="refresh-employees">↻ Refresh</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Code</th><th>Department</th><th>Shift</th><th>Joined</th></tr></thead><tbody id="employees-body"><tr><td colspan="5" class="empty-state">Loading employees…</td></tr></tbody></table></div>
+            <div class="pagination"><button class="button button-quiet button-small" id="employees-prev" type="button" disabled>← Previous</button><span id="employees-page">Page 1</span><button class="button button-quiet button-small" id="employees-next" type="button" disabled>Next →</button></div>
+          </div>
+        </section>
+
+        <section class="section-block" id="attendance">
+          <div class="section-heading">
+            <div><p class="eyebrow">DAILY OPERATIONS</p><h2>Attendance</h2><p class="muted">Record a shift or review attendance activity.</p></div>
+          </div>
+          <div class="action-grid">
+            <form class="panel compact-form" id="punch-in-form">
+              <div class="panel-title"><span class="stat-icon icon-green">↘</span><div><h3>Punch in</h3><p class="muted">Start an attendance record.</p></div></div>
+              <label>Employee code<input name="emp_code" required placeholder="EMP0001"></label>
+              <label>Attendance status<select name="status"><option value="PRESENT">Present</option><option value="WFH">Work from home</option><option value="ON_DUTY">On duty</option></select></label>
+              <label>Time <span class="optional-label">optional</span><input name="punched_at" type="datetime-local"></label>
+              <p class="field-hint">Leave blank to use the current time.</p>
+              <button class="button button-primary" type="submit">Record punch in</button>
+            </form>
+            <form class="panel compact-form" id="punch-out-form">
+              <div class="panel-title"><span class="stat-icon icon-blue">↗</span><div><h3>Punch out</h3><p class="muted">Complete an open attendance record.</p></div></div>
+              <label>Employee code<input name="emp_code" required placeholder="EMP0001"></label>
+              <label>Time <span class="optional-label">optional</span><input name="punched_at" type="datetime-local"></label>
+              <p class="field-hint">Leave blank to use the current time.</p>
+              <button class="button button-secondary" type="submit">Record punch out</button>
+            </form>
+          </div>
+          <div class="panel table-panel attendance-panel">
+            <div class="table-toolbar">
+              <div><h3>Attendance records</h3><p class="muted" id="attendance-count">Use filters to review records.</p></div>
+              <form class="filter-form" id="attendance-filter">
+                <input name="emp_code" aria-label="Filter by employee code" placeholder="Employee code">
+                <input name="date_from" type="date" aria-label="From date">
+                <input name="date_to" type="date" aria-label="To date">
+                <select name="status" aria-label="Filter by status"><option value="">All statuses</option><option>PRESENT</option><option>WFH</option><option>ON_DUTY</option><option>ABSENT</option><option>LEAVE</option></select>
+                <button class="button button-primary button-small" type="submit">Filter</button>
+              </form>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Punch in</th><th>Punch out</th><th>Hours</th><th>Late</th></tr></thead><tbody id="attendance-body"><tr><td colspan="7" class="empty-state">Loading attendance…</td></tr></tbody></table></div>
+            <div class="pagination"><button class="button button-quiet button-small" id="attendance-prev" type="button" disabled>← Previous</button><span id="attendance-page">Page 1</span><button class="button button-quiet button-small" id="attendance-next" type="button" disabled>Next →</button></div>
+          </div>
+        </section>
+
+        <section class="section-block" id="analytics">
+          <div class="section-heading">
+            <div><p class="eyebrow">INSIGHTS</p><h2>Analytics</h2><p class="muted">Reports powered by the existing attendance analytics endpoints.</p></div>
+          </div>
+          <div class="analytics-grid">
+            <article class="panel report-card">
+              <div class="panel-title"><div><h3>Employee monthly summary</h3><p class="muted">Attendance totals for one employee.</p></div></div>
+              <form class="inline-form" id="monthly-form"><input name="emp_code" required placeholder="Employee code"><input name="month" type="month" required><button class="button button-primary button-small">View</button></form>
+              <div id="monthly-result" class="report-result muted">Choose an employee and month.</div>
+            </article>
+            <article class="panel report-card">
+              <div class="panel-title"><div><h3>Department summary</h3><p class="muted">Monthly headcount and attendance.</p></div></div>
+              <form class="inline-form" id="department-summary-form"><input name="month" type="month" required><input name="department" placeholder="Department (optional)"><button class="button button-primary button-small">View</button></form>
+              <div id="department-summary-result" class="report-result muted">Choose a month to view the summary.</div>
+            </article>
+            <article class="panel report-card">
+              <div class="panel-title"><div><h3>Late arrivals</h3><p class="muted">Ranked by total late minutes.</p></div></div>
+              <form class="inline-form" id="leaderboard-form"><input name="month" type="month" required><input name="department" placeholder="Department (optional)"><button class="button button-primary button-small">View</button></form>
+              <div id="leaderboard-result" class="report-result muted">Choose a month to view the leaderboard.</div>
+            </article>
+            <article class="panel report-card">
+              <div class="panel-title"><div><h3>Department trend</h3><p class="muted">Daily attendance rate and moving average.</p></div></div>
+              <form class="inline-form trend-form" id="trend-form"><input name="department" required placeholder="Department"><input name="from" type="date" required aria-label="From date"><input name="to" type="date" required aria-label="To date"><button class="button button-primary button-small">View</button></form>
+              <div id="trend-result" class="report-result muted">Choose a department and date range.</div>
+            </article>
+          </div>
+        </section>
+        <footer class="footer">HROne People Operations <span>·</span> Employee Attendance &amp; Analytics</footer>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

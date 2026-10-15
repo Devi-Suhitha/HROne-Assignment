@@ -421,6 +421,19 @@ def test_health_endpoint(client):
     assert response.json() == {"status": "ok"}
 
 
+def test_frontend_is_served_by_fastapi(client):
+    page = client.get("/")
+    script = client.get("/static/app.js")
+    stylesheet = client.get("/static/styles.css")
+
+    assert page.status_code == 200
+    assert "HROne | People & Attendance" in page.text
+    assert script.status_code == 200
+    assert "/employees?page=" in script.text
+    assert '"/attendance/punch-in"' in script.text
+    assert stylesheet.status_code == 200
+
+
 def test_employee_create_list_and_validation(client, employee_factory):
     create = client.post("/employees", json=employee_factory())
     assert create.status_code == 201
